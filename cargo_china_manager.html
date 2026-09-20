@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cargo China — учёт</title>
+<style>
+:root{--bg:#f4f6fa;--card:#fff;--text:#172033;--muted:#718096;--line:#e2e8f0;--blue:#2563eb;--green:#16a34a;--orange:#ea580c;--purple:#7c3aed;--red:#dc2626}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,sans-serif}.wrap{max-width:1150px;margin:auto;padding:20px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}h1{margin:0;font-size:27px}h2{margin:0 0 14px}.muted{color:var(--muted)}button{border:0;border-radius:10px;padding:11px 15px;cursor:pointer;font-weight:600}.primary{background:var(--blue);color:white}.dark{background:#172033;color:#fff}.light{background:#fff;border:1px solid var(--line)}.danger{background:#fee2e2;color:#991b1b}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 7px 25px #1720330b}
+.address{line-height:1.6}.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px}.stat b{font-size:25px;display:block}.stat span{color:var(--muted);font-size:13px}
+.formgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:5px}.field input,.field select{width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:15px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.orders{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.order{background:#fff;border:1px solid var(--line);border-radius:15px;padding:16px}.ordertop{display:flex;justify-content:space-between;gap:10px}.badge{padding:6px 9px;border-radius:99px;font-size:12px;font-weight:700}.sent{background:#dcfce7;color:#166534}.planned{background:#ffedd5;color:#9a3412}.preparing{background:#ede9fe;color:#6d28d9}.cancelled{background:#fee2e2;color:#991b1b}.product{font-size:19px;font-weight:750;margin:12px 0 7px}.rows{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.kv{background:#f8fafc;padding:9px;border-radius:9px}.kv small{display:block;color:var(--muted)}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.search{flex:1;min-width:230px;padding:11px;border:1px solid var(--line);border-radius:10px}
+.public{max-width:700px;margin:auto}.public .order{box-shadow:0 10px 35px #17203312}.notice{background:#eff6ff;border:1px solid #bfdbfe;padding:12px;border-radius:10px;color:#1e40af;margin-bottom:14px}
+@media(max-width:800px){.stats{grid-template-columns:repeat(2,1fr)}.formgrid,.orders{grid-template-columns:1fr}}@media(max-width:430px){.wrap{padding:12px}.stats{grid-template-columns:1fr 1fr}.rows{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const KEY="cargoChinaOrders";
+const initial=[
+{id:"CN-001",client:"Клиент 1",product:"Постельное бельё 4 предмета",productZh:"四件套床上用品",supplier:"1688 Supplier A",wechat:"supplier_a",qty:50,price:38,rate:13.2,weight:85,delivery:1200,paid:3000,status:"sent",date:"2026-09-12"},
+{id:"CN-002",client:"Клиент 2",product:"Товары для дома",productZh:"家居用品",supplier:"1688 Supplier B",wechat:"supplier_b",qty:100,price:22,rate:13.2,weight:60,delivery:900,paid:1000,status:"planned",date:"2026-09-15"}
+];
+let orders=JSON.parse(localStorage.getItem(KEY)||"null")||initial;
+let editId=null;
+
+const statusName={sent:["Отправлено","已发货"],planned:["Планируется","计划中"],preparing:["Подготавливается","准备中"],cancelled:["Отменено","已取消"]};
+function money(n){return Number(n||0).toLocaleString("ru-RU",{maximumFractionDigits:2})}
+function save(){localStorage.setItem(KEY,JSON.stringify(orders));render()}
+function totals(o){let goods=o.qty*o.price;let som=goods*o.rate;let total=som+Number(o.delivery||0);return {goods,som,total,debt:total-Number(o.paid||0)}}
+function status(s){return statusName[s]||statusName.planned}
+function card(o, publicMode=false){
+ let x=totals(o), st=status(o.status);
+ return `<div class="order">
+  <div class="ordertop"><div class="muted">#${o.id}</div><span class="badge ${o.status}">${st[0]} · ${st[1]}</span></div>
+  <div class="product">${o.product}</div><div class="muted">${o.productZh}</div>
+  <div class="rows">
+   <div class="kv"><small>Клиент</small><b>${o.client||"—"}</b></div>
+   <div class="kv"><small>Дата</small><b>${o.date||"—"}</b></div>
+   <div class="kv"><small>Количество</small><b>${o.qty} шт.</b></div>
+   <div class="kv"><small>Вес</small><b>${o.weight||0} кг</b></div>
+   <div class="kv"><small>Товар</small><b>¥${money(x.goods)}</b></div>
+   <div class="kv"><small>Курс</small><b>${o.rate} сом</b></div>
+   <div class="kv"><small>Товар в сомах</small><b>${money(x.som)} сом</b></div>
+   <div class="kv"><small>Доставка</small><b>${money(o.delivery)} сом</b></div>
+   <div class="kv"><small>Итого</small><b>${money(x.total)} сом</b></div>
+   <div class="kv"><small>Оплачено</small><b>${money(o.paid)} сом</b></div>
+   <div class="kv"><small>Остаток</small><b>${money(Math.max(0,x.debt))} сом</b></div>
+   <div class="kv"><small>Поставщик / WeChat</small><b>${o.supplier} / ${o.wechat}</b></div>
+  </div>
+  ${publicMode?"":`<div class="actions"><button class="light" onclick="editOrder('${o.id}')">Изменить</button><button class="primary" onclick="shareOrder('${o.id}')">🔗 Ссылка клиенту</button><button class="danger" onclick="deleteOrder('${o.id}')">Удалить</button></div>`}
+ </div>`
+}
+function render(){
+ const hash=location.hash;
+ if(hash.startsWith("#view=")){renderPublic(hash.slice(6));return}
+ renderAdmin();
+}
+function renderAdmin(){
+ let total=orders.reduce((s,o)=>s+totals(o).total,0), debt=orders.reduce((s,o)=>s+Math.max(0,totals(o).debt),0);
+ app.innerHTML=`<div class="wrap">
+ <header><div><h1>📦 Cargo China</h1><div class="muted">Учёт закупок, логистики и расчётов</div></div><button class="dark" onclick="addOrder()">＋ Добавить заказ</button></header>
+ <div class="card address"><b>📍 Склад</b><br>浙江省金华市金东区孝顺镇广顺南街与集贤路红绿灯路口左拐P栋一楼B区<br>👤 天驰: 18680378056 &nbsp; 🚨 天仁: 13249858824</div>
+ <div class="stats">
+  <div class="stat"><b>${orders.length}</b><span>Всего заказов</span></div><div class="stat"><b>${orders.filter(x=>x.status==="sent").length}</b><span>Отправлено</span></div>
+  <div class="stat"><b>${orders.filter(x=>x.status==="planned").length}</b><span>Планируется</span></div><div class="stat"><b>${money(total)}</b><span>Оборот, сом</span></div><div class="stat"><b>${money(debt)}</b><span>Остаток, сом</span></div>
+ </div>
+ <div id="form"></div>
+ <div class="card"><div class="toolbar"><input id="q" class="search" placeholder="Поиск по клиенту, товару, номеру, поставщику..." oninput="listOrders()"><select id="filter" onchange="listOrders()"><option value="all">Все статусы</option><option value="sent">Отправлено</option><option value="planned">Планируется</option><option value="preparing">Подготавливается</option><option value="cancelled">Отменено</option></select><button class="light" onclick="exportData()">Экспорт JSON</button><button class="light" onclick="importData()">Импорт JSON</button></div></div>
+ <div id="list" class="orders"></div></div>`;
+ listOrders();
+}
+function listOrders(){
+ let q=(document.getElementById("q")?.value||"").toLowerCase(), f=document.getElementById("filter")?.value||"all";
+ let a=orders.filter(o=>(f==="all"||o.status===f)&&(!q||JSON.stringify(o).toLowerCase().includes(q)));
+ document.getElementById("list").innerHTML=a.length?a.map(o=>card(o)).join(""):`<div class="card" style="grid-column:1/-1;text-align:center">Ничего не найдено</div>`;
+}
+function form(o={}){
+ return `<div class="card"><h2>${editId?"✏️ Изменить заказ":"➕ Новый заказ"}</h2>
+ <div class="formgrid">
+ <div class="field"><label>Номер заказа</label><input id="f_id" value="${o.id||"CN-"+String(Date.now()).slice(-5)}"></div>
+ <div class="field"><label>Клиент</label><input id="f_client" value="${o.client||""}"></div>
+ <div class="field"><label>Дата</label><input id="f_date" type="date" value="${o.date||new Date().toISOString().slice(0,10)}"></div>
+ <div class="field"><label>Товар RU</label><input id="f_product" value="${o.product||""}"></div>
+ <div class="field"><label>Товар 中文</label><input id="f_productZh" value="${o.productZh||""}"></div>
+ <div class="field"><label>Поставщик</label><input id="f_supplier" value="${o.supplier||""}"></div>
+ <div class="field"><label>WeChat ID</label><input id="f_wechat" value="${o.wechat||""}"></div>
+ <div class="field"><label>Количество, шт.</label><input id="f_qty" type="number" value="${o.qty||1}"></div>
+ <div class="field"><label>Цена за шт., ¥</label><input id="f_price" type="number" step="0.01" value="${o.price||0}"></div>
+ <div class="field"><label>Курс ¥ → сом</label><input id="f_rate" type="number" step="0.01" value="${o.rate||13.2}"></div>
+ <div class="field"><label>Вес, кг</label><input id="f_weight" type="number" step="0.01" value="${o.weight||0}"></div>
+ <div class="field"><label>Доставка, сом</label><input id="f_delivery" type="number" step="0.01" value="${o.delivery||0}"></div>
+ <div class="field"><label>Оплачено, сом</label><input id="f_paid" type="number" step="0.01" value="${o.paid||0}"></div>
+ <div class="field"><label>Статус</label><select id="f_status">${Object.keys(statusName).map(s=>`<option value="${s}" ${o.status===s?"selected":""}>${status(s)[0]} · ${status(s)[1]}</option>`).join("")}</select></div>
+ </div><div class="actions"><button class="primary" onclick="saveOrder()">Сохранить</button><button class="light" onclick="document.getElementById('form').innerHTML=''">Отмена</button></div></div>`;
+}
+function addOrder(){editId=null;document.getElementById("form").innerHTML=form()}
+function editOrder(id){let o=orders.find(x=>x.id===id);editId=id;document.getElementById("form").innerHTML=form(o);scrollTo(0,250)}
+function val(id){return document.getElementById(id).value}
+function saveOrder(){
+ let o={id:val("f_id"),client:val("f_client"),date:val("f_date"),product:val("f_product"),productZh:val("f_productZh"),supplier:val("f_supplier"),wechat:val("f_wechat"),qty:+val("f_qty"),price:+val("f_price"),rate:+val("f_rate"),weight:+val("f_weight"),delivery:+val("f_delivery"),paid:+val("f_paid"),status:val("f_status")};
+ if(editId) orders=orders.map(x=>x.id===editId?o:x); else orders.unshift(o);
+ save();document.getElementById("form").innerHTML="";
+}
+function deleteOrder(id){if(confirm("Удалить заказ "+id+"?")){orders=orders.filter(o=>o.id!==id);save()}}
+function shareOrder(id){
+ let o=orders.find(x=>x.id===id);
+ let data=btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+ let url=location.href.split("#")[0]+"#view="+data;
+ navigator.clipboard?.writeText(url);
+ prompt("Скопируй эту ссылку и отправь клиенту:",url);
+}
+function renderPublic(encoded){
+ try{
+  let o=JSON.parse(decodeURIComponent(escape(atob(encoded))));
+  app.innerHTML=`<div class="wrap public"><header><div><h1>📦 Cargo China</h1><div class="muted">Информация по вашему заказу</div></div></header><div class="notice">Эта страница предназначена только для просмотра. Изменить данные здесь нельзя.</div>${card(o,true)}<p class="muted" style="text-align:center">RU · 中文</p></div>`;
+ }catch(e){app.innerHTML='<div class="wrap"><div class="card">Некорректная ссылка заказа.</div></div>'}
+}
+function exportData(){let blob=new Blob([JSON.stringify(orders,null,2)],{type:"application/json"});let a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="cargo-china-orders.json";a.click()}
+function importData(){let i=document.createElement("input");i.type="file";i.accept=".json";i.onchange=()=>{let r=new FileReader();r.onload=()=>{try{orders=JSON.parse(r.result);save()}catch(e){alert("Ошибка JSON")}};r.readAsText(i.files[0])};i.click()}
+render();
+</script>
+</body></html>
